@@ -120,5 +120,3 @@ If the server exits the accept loop or encounters a fatal error:
 - The server does not parse HTTP headers or methods in detail; it responds "200 OK" to everything.
 - It uses a fixed-size receive buffer (RECV_BUF_SIZE) and does only a single recv() call.
 - It uses a thread-per-connection model, which is simple but not optimal for very high numbers of clients.
-
-This simplicity makes it a good learning example for understanding how sockets, binding, listening, accepting connections, and basic HTTP responses work in C.
