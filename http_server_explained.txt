@@ -1,7 +1,7 @@
 HTTP Server (C, Concurrent) - Explanation
 
 1. Overview
-This program implements a minimal HTTP server in C. It listens on a TCP port (8080), accepts incoming connections, and responds to each HTTP request with a simple "Hello, world!" message. It supports Windows and Unix-like systems using conditional compilation and handles each client connection in a separate thread.
+This program implements a minimal HTTP server in C. It listens on a TCP port (8080), accepts incoming connections, and responds to each HTTP request by serving a html file. It supports Windows and Unix-like systems using conditional compilation and handles each client connection in a separate thread.
 
 2. Platform-specific setup (#ifdef _WIN32 / #else / #endif)
 The code uses a preprocessor block to support both Windows and non-Windows systems:
@@ -32,9 +32,9 @@ This abstraction lets the rest of the code use socket_t, CLOSESOCKET, CLEANUPWSA
 4. HTTP response template
 The server defines a constant string that represents a complete HTTP/1.1 response:
 - Status line: "HTTP/1.1 200 OK\r\n"
-- Headers: Content-Type: text/plain, Content-Length: 13, Connection: close
+- Headers: Content-Type: text/html, Content-Length: size of index.html, Connection: close
 - Blank line: "\r\n" separates headers from the body
-- Body: "Hello, world!"
+- Body: Contents of index.html
 
 When a request is received, the server simply sends this fixed response back to the client.
 
