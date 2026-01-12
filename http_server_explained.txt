@@ -1,0 +1,124 @@
+HTTP Server (C, Concurrent) - Explanation
+
+1. Overview
+This program implements a minimal HTTP server in C. It listens on a TCP port (8080), accepts incoming connections, and responds to each HTTP request with a simple "Hello, world!" message. It supports Windows and Unix-like systems using conditional compilation and handles each client connection in a separate thread.
+
+2. Platform-specific setup (#ifdef _WIN32 / #else / #endif)
+The code uses a preprocessor block to support both Windows and non-Windows systems:
+- On Windows (_WIN32 is defined):
+  - Includes <windows.h>, <winsock2.h>, and <ws2tcpip.h> for the Winsock networking API.
+  - Uses #pragma comment(lib, "Ws2_32.lib") so the linker includes the Winsock library.
+  - typedef SOCKET socket_t; so the rest of the code can use socket_t instead of SOCKET.
+  - Defines helper macros:
+    - CLOSESOCKET -> closesocket
+    - CLEANUPWSA  -> WSACleanup()
+
+- On Unix-like systems (Linux/macOS, etc.):
+  - Includes standard POSIX socket headers: <sys/types.h>, <sys/socket.h>, <netinet/in.h>, <arpa/inet.h>, <unistd.h>, and <pthread.h> for threads.
+  - typedef int socket_t; because sockets are file descriptors represented as ints.
+  - Defines missing constants and helpers:
+    - INVALID_SOCKET = -1
+    - SOCKET_ERROR   = -1
+    - CLOSESOCKET    -> close
+    - CLEANUPWSA     -> does nothing (no Winsock to clean up)
+
+This abstraction lets the rest of the code use socket_t, CLOSESOCKET, CLEANUPWSA, etc. without worrying about which OS it is running on.
+
+3. Constants: PORT, BACKLOG, RECV_BUF_SIZE
+- PORT: The TCP port the server listens on (8080). Clients connect to this port.
+- BACKLOG: The maximum number of pending connections that can wait in the listen queue before accept() handles them. For example, BACKLOG 10 means up to 10 connections can be waiting.
+- RECV_BUF_SIZE: Size (in bytes) of the buffer used to receive the HTTP request, e.g. 4096 bytes (4 KB).
+
+4. HTTP response template
+The server defines a constant string that represents a complete HTTP/1.1 response:
+- Status line: "HTTP/1.1 200 OK\r\n"
+- Headers: Content-Type: text/plain, Content-Length: 13, Connection: close
+- Blank line: "\r\n" separates headers from the body
+- Body: "Hello, world!"
+
+When a request is received, the server simply sends this fixed response back to the client.
+
+5. client_info structure
+The struct client_info holds:
+- client_fd: the socket descriptor (socket_t) for the connected client.
+- client_addr: the client's address information (struct sockaddr_in).
+
+A pointer to this struct is passed to the thread function so each thread knows which client socket to handle.
+
+6. Client handler thread (client_thread)
+This function runs in a separate thread for each client connection:
+- Casts the generic void* or LPVOID argument back to struct client_info*.
+- Uses recv() to read up to RECV_BUF_SIZE - 1 bytes into a buffer.
+- Null-terminates the buffer so it can be printed as a C string.
+- Prints the received HTTP request to the console (for debugging/learning).
+- Sends the fixed HTTP response string using send().
+- Closes the client socket with CLOSESOCKET().
+- Frees the dynamically allocated client_info structure.
+
+On Windows it returns DWORD; on Unix-like systems it returns void*. The behavior is otherwise the same.
+
+7. main(): server setup and loop
+The main function performs these steps:
+
+7.1. Initialize networking (Windows only)
+- On Windows, calls WSAStartup(MAKEWORD(2, 2), &wsaData) to initialize the Winsock library.
+- If this fails, the program prints an error and exits.
+
+7.2. Create the listening socket
+- Calls socket(AF_INET, SOCK_STREAM, 0):
+  - AF_INET: IPv4
+  - SOCK_STREAM: TCP (stream-oriented)
+- Checks for INVALID_SOCKET to ensure the socket was created successfully.
+
+7.3. Set socket options (non-Windows)
+- On Unix-like systems, sets SO_REUSEADDR via setsockopt(). This allows the port to be reused quickly after the server restarts.
+
+7.4. Bind to an address and port
+- Fills out a sockaddr_in structure:
+  - sin_family = AF_INET
+  - sin_port   = htons(PORT)           (host to network byte order)
+  - sin_addr.s_addr = htonl(INADDR_ANY) (listen on all local interfaces)
+- Calls bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) to associate the socket with the chosen address and port.
+
+7.5. Start listening
+- Calls listen(server_fd, BACKLOG) to mark the socket as a listening socket.
+- After this, the OS starts queueing incoming connection requests for accept().
+
+7.6. Accept loop
+The server then enters an infinite loop:
+- Calls accept(server_fd, (struct sockaddr*)&client_addr, &client_len):
+  - Blocks until a client connects.
+  - Returns a new socket descriptor client_fd for that connection.
+- Allocates a new struct client_info on the heap and fills in client_fd and client_addr.
+- Creates a new thread to handle the client:
+  - On Windows: CreateThread(..., client_thread, info, ...)
+  - On Unix-like: pthread_create(&tid, NULL, client_thread, info)
+- Detaches the thread:
+  - On Windows: CloseHandle(hThread) to avoid needing to Join.
+  - On Unix-like: pthread_detach(tid) to let the system clean up when the thread finishes.
+- The main thread immediately goes back to accept() to wait for more connections.
+
+This design is called "thread-per-connection" because each client is handled by a separate thread.
+
+8. Cleanup
+If the server exits the accept loop or encounters a fatal error:
+- Closes the listening socket with CLOSESOCKET(server_fd).
+- Calls CLEANUPWSA (which is WSACleanup() on Windows and a no-op on other systems).
+
+9. How the server behaves at runtime
+1) You start the server, which binds to port 8080 and listens for connections.
+2) A client (e.g., curl or a browser) connects to http://localhost:8080/.
+3) accept() returns a client socket, and the server spawns a new thread to handle it.
+4) The client thread:
+   - Reads the HTTP request from the client.
+   - Prints the request to the server console.
+   - Sends back the fixed "Hello, world!" HTTP response.
+   - Closes the client socket and exits.
+5) Meanwhile, the main thread continues to accept new connections and spawn new threads.
+
+10. Limitations and simplifications
+- The server does not parse HTTP headers or methods in detail; it responds "200 OK" to everything.
+- It uses a fixed-size receive buffer (RECV_BUF_SIZE) and does only a single recv() call.
+- It uses a thread-per-connection model, which is simple but not optimal for very high numbers of clients.
+
+This simplicity makes it a good learning example for understanding how sockets, binding, listening, accepting connections, and basic HTTP responses work in C.
