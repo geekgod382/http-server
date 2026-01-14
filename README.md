@@ -26,12 +26,19 @@ gcc server.c -o server -pthread
 ./server
 ```
 
-- Windows (MinGW):
+- Windows (MYSYS2 MinGW64)
 
-```sh
-gcc server.c -o server -lws2_32
+This project must be built using MSYS2 MinGW64.
+Do not use Windows CMD or PowerShell.
 
-./server.exe
+```bash
+pacman -S mingw-w64-x86_64-gcc make   # installing make
+
+cd /c/path/to/project
+
+make
+
+./server
 ```
 
 ---
