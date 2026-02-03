@@ -23,7 +23,7 @@ A small, cross-platform (POSIX / Windows) concurrent HTTP server written in C th
 ```sh
 gcc server.c -o server -pthread
 
-./server
+./server.exe
 ```
 
 - Windows (MYSYS2 MinGW64)
@@ -38,7 +38,7 @@ cd /c/path/to/project
 
 make
 
-./server
+./server.exe
 ```
 
 ---
