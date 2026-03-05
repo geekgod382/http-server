@@ -28,7 +28,7 @@ gcc server.c -o server -pthread
 
 - Windows (MYSYS2 MinGW64)
 
-This project must be built using MSYS2 MinGW64.
+This project MUST be built using MSYS2 MinGW64.
 Do not use Windows CMD or PowerShell.
 
 ```bash
